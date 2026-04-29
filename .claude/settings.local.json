@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/SAIRAM/Desktop/**)",
+      "Bash(pandoc ReadLens_PRD.docx -o -)",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "WebFetch(domain:www.youtube.com)"
+    ]
+  }
+}
