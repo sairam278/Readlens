@@ -17,17 +17,26 @@ export default class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center animate-fade-in py-12">
           <div className="text-4xl mb-4">⚠️</div>
           <h2 className="font-serif text-lg font-bold text-ink mb-2">Something went wrong</h2>
-          <p className="text-sm text-muted mb-6 max-w-sm leading-relaxed">
+          <p className="text-sm text-muted mb-4 max-w-sm leading-relaxed">
             An unexpected error occurred in this view. Your notes and progress are safe.
           </p>
+          {this.state.error && (
+            <div className="mb-6 p-3 bg-card border border-danger/40 text-danger text-xs font-mono rounded-xl max-w-md text-left overflow-auto whitespace-pre-wrap">
+              {this.state.error.message || String(this.state.error)}
+            </div>
+          )}
           <button
-            onClick={() => this.setState({ hasError: false, error: null })}
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.hash = "#/dashboard";
+              window.location.reload();
+            }}
             className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gold text-bg hover:bg-gold-light transition-all cursor-pointer"
           >
-            Try again
+            Reset & Go to Dashboard
           </button>
         </div>
       );

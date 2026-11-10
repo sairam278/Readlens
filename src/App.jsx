@@ -37,6 +37,13 @@ const MoonIcon = () => (
   </svg>
 );
 
+const SepiaIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+  </svg>
+);
+
 const ChevronDown = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <polyline points="6 9 12 15 18 9"/>
@@ -63,7 +70,39 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem("rl-theme") || "dark");
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem("rl-user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Verify session token on initial mount
+  useEffect(() => {
+    const token = localStorage.getItem("rl-token");
+    if (!token) return;
+    fetch("http://localhost:5000/api/auth/me", {
+      headers: { Authorization: "Bearer " + token },
+    })
+      .then(r => {
+        if (!r.ok) throw new Error("Invalid session");
+        return r.json();
+      })
+      .then(userData => {
+        if (userData && userData.email) {
+          setUser(userData);
+          localStorage.setItem("rl-user", JSON.stringify(userData));
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem("rl-token");
+        localStorage.removeItem("rl-user");
+        setUser(null);
+      });
+  }, []);
+
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [userProgress, setUserProgress] = useState({});
@@ -131,24 +170,53 @@ export default function App() {
     return () => document.removeEventListener("mousedown", close);
   }, [profileOpen]);
 
-  const toggleTheme = () => setTheme(t => t === "dark" ? "light" : "dark");
+  const displayName = user?.name || user?.email?.split("@")[0] || "User";
+  const displayInitial = (displayName[0] || "U").toUpperCase();
+
+  const cycleTheme = () => {
+    setTheme(t => {
+      if (t === "dark") return "sepia";
+      if (t === "sepia") return "light";
+      return "dark";
+    });
+  };
+
+  const themeLabel = {
+    dark: "Obsidian (Dark)",
+    sepia: "Warm Paper (Sepia)",
+    light: "Clean Paper (Light)",
+  }[theme] || "Theme";
+
+  const renderThemeIcon = () => {
+    if (theme === "dark") return <MoonIcon />;
+    if (theme === "sepia") return <SepiaIcon />;
+    return <SunIcon />;
+  };
+
   const navigate = (id) => {
     window.location.hash = "/" + id;
     setScreen(id);
     setMenuOpen(false);
     setProfileOpen(false);
   };
-  const handleAuthGo = (id) => {
-    if (id === "dashboard") setUser({ name: "Sairam", email: "sairamkandhagatla18@gmail.com" });
-    navigate(id);
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
   };
-  const logout = () => { setUser(null); navigate("landing"); };
+
+  const logout = () => {
+    localStorage.removeItem("rl-token");
+    localStorage.removeItem("rl-user");
+    setUser(null);
+    setProfileOpen(false);
+    navigate("landing");
+  };
 
   return (
     <div className="min-h-screen bg-bg">
       {/* ── NAV ── */}
       <nav className="sticky top-0 z-50 border-b border-line bg-bg/95 backdrop-blur-md">
-        <div className="flex items-center justify-between gap-3 px-6 py-4">
+        <div className="flex items-center justify-between gap-3 px-6 py-3.5">
 
           {/* Logo */}
           <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => navigate("landing")}>
@@ -158,7 +226,7 @@ export default function App() {
             <span className="font-serif text-xl font-bold text-ink">ReadLens</span>
           </div>
 
-          {/* Desktop nav pill */}
+          {/* Center navigation tabs */}
           <div className="hidden md:flex gap-1 bg-surface rounded-xl p-1 border border-line">
             {navItems.map(n => (
               <button
@@ -182,12 +250,12 @@ export default function App() {
               <span className="text-muted font-normal">day streak</span>
             </div>
             <button
-              onClick={toggleTheme}
+              onClick={cycleTheme}
               className="w-9 h-9 flex items-center justify-center rounded-lg bg-surface border border-line text-muted hover:text-gold hover:border-gold-dim transition-all cursor-pointer"
               aria-label="Toggle theme"
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              title={`Current theme: ${themeLabel}. Click to switch.`}
             >
-              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+              {renderThemeIcon()}
             </button>
 
             {user ? (
@@ -197,16 +265,16 @@ export default function App() {
                   className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-xl bg-surface border border-line hover:border-gold-dim transition-all cursor-pointer group"
                 >
                   <div className="w-7 h-7 rounded-full bg-gold/20 border border-gold/40 flex items-center justify-center text-[11px] font-bold text-gold">
-                    {user.name[0]}
+                    {displayInitial}
                   </div>
-                  <span className="text-xs font-medium text-ink">{user.name}</span>
+                  <span className="text-xs font-medium text-ink">{displayName}</span>
                   <span className="text-muted group-hover:text-gold transition-colors"><ChevronDown /></span>
                 </button>
                 {profileOpen && (
                   <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-line rounded-xl shadow-xl overflow-hidden animate-fade-in z-50">
                     <div className="px-4 py-3 border-b border-line">
-                      <div className="text-xs font-semibold text-ink">{user.name}</div>
-                      <div className="text-[11px] text-muted truncate">{user.email}</div>
+                      <div className="text-xs font-semibold text-ink">{displayName}</div>
+                      <div className="text-[11px] text-muted truncate">{user?.email || ""}</div>
                     </div>
                     {[
                       { label: "Dashboard", id: "dashboard" },
@@ -249,11 +317,12 @@ export default function App() {
               <span className="font-mono">14</span>
             </div>
             <button
-              onClick={toggleTheme}
+              onClick={cycleTheme}
               className="w-9 h-9 flex items-center justify-center rounded-lg bg-surface border border-line text-muted hover:text-gold transition-colors cursor-pointer"
               aria-label="Toggle theme"
+              title={`Current: ${themeLabel}`}
             >
-              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+              {renderThemeIcon()}
             </button>
             <button
               onClick={() => setMenuOpen(o => !o)}
@@ -314,15 +383,15 @@ export default function App() {
         )}
       </nav>
 
-      {screen === "landing"   && <LandingScreen   go={setScreen} />}
-      {screen === "dashboard" && <DashboardScreen go={setScreen} />}
-      {screen === "docmap"    && <DocMapScreen    go={setScreen} />}
-      {screen === "reading"   && <ErrorBoundary><ReadingScreen   go={setScreen} /></ErrorBoundary>}
-      {screen === "quiz"      && <ErrorBoundary><QuizScreen      go={setScreen} weakConcepts={weakConcepts} onComplete={handleQuizComplete} /></ErrorBoundary>}
-      {screen === "summary"   && <SummaryScreen   go={setScreen} weakConcepts={weakConcepts} conceptResults={lastConceptResults} />}
-      {screen === "progress"  && <ProgressScreen  go={setScreen} />}
-      {screen === "login"     && <LoginScreen     go={handleAuthGo} />}
-      {screen === "signup"    && <SignupScreen     go={handleAuthGo} />}
+      {screen === "landing"   && <LandingScreen   go={navigate} />}
+      {screen === "dashboard" && <DashboardScreen go={navigate} />}
+      {screen === "docmap"    && <DocMapScreen    go={navigate} />}
+      {screen === "reading"   && <ErrorBoundary><ReadingScreen   go={navigate} /></ErrorBoundary>}
+      {screen === "quiz"      && <ErrorBoundary><QuizScreen      go={navigate} weakConcepts={weakConcepts} onComplete={handleQuizComplete} /></ErrorBoundary>}
+      {screen === "summary"   && <SummaryScreen   go={navigate} weakConcepts={weakConcepts} conceptResults={lastConceptResults} />}
+      {screen === "progress"  && <ProgressScreen  go={navigate} />}
+      {screen === "login"     && <LoginScreen     go={navigate} onLogin={handleLoginSuccess} />}
+      {screen === "signup"    && <SignupScreen    go={navigate} onLogin={handleLoginSuccess} />}
 
       {/* ── Keyboard Shortcuts Modal ── */}
       {showShortcuts && (

@@ -19,22 +19,52 @@ function calcStrength(pw) {
 const STRENGTH_LABEL = ["", "Weak", "Fair", "Good", "Strong"];
 const STRENGTH_COLOR = ["", "bg-danger", "bg-gold/60", "bg-gold", "bg-emerald"];
 
-export default function SignupScreen({ go }) {
+export default function SignupScreen({ go, onLogin }) {
   const [name, setName]         = useState("");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
 
   const strength = calcStrength(password);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) { setError("Please enter your full name."); return; }
     if (!email) { setError("Please enter your email."); return; }
     if (!EMAIL_RE.test(email)) { setError("Please enter a valid email address."); return; }
     if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
-    go("dashboard");
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Signup failed. Please try a different email.");
+      }
+
+      if (data.token) {
+        localStorage.setItem("rl-token", data.token);
+      }
+      if (data.user) {
+        localStorage.setItem("rl-user", JSON.stringify(data.user));
+        onLogin?.(data.user);
+      }
+
+      go("dashboard");
+    } catch (err) {
+      setError(err.message || "Unable to complete registration.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -140,9 +170,11 @@ export default function SignupScreen({ go }) {
             {/* Submit */}
             <button
               type="submit"
-              className="w-full bg-gold text-bg py-3 rounded-xl font-semibold text-sm hover:bg-gold-light hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(212,168,83,0.3)] transition-all cursor-pointer mt-1"
+              disabled={loading}
+              className="w-full bg-gold text-bg py-3 rounded-xl font-semibold text-sm hover:bg-gold-light hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(212,168,83,0.3)] transition-all cursor-pointer mt-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Create account
+              {loading && <div className="w-4 h-4 border-2 border-bg border-t-transparent rounded-full animate-spin" />}
+              <span>{loading ? "Creating account…" : "Create account"}</span>
             </button>
 
             <p className="text-xs text-muted text-center leading-relaxed">

@@ -64,7 +64,11 @@ export default function DocMapScreen({ go }) {
         <h2 className="text-xs uppercase tracking-[0.1em] text-muted font-semibold mb-3">Section Breakdown</h2>
         <div className="flex flex-col gap-2">
           {sections.map((s, i) => (
-            <div key={s.name} className="flex items-center gap-4 bg-card border border-line rounded-xl px-4 py-4 hover:border-gold-dim transition-all cursor-pointer">
+            <div
+              key={s.name}
+              onClick={() => go("reading")}
+              className="flex items-center gap-4 bg-card border border-line rounded-xl px-4 py-4 hover:border-gold-dim transition-all cursor-pointer"
+            >
               <div className="w-7 h-7 rounded-lg bg-gold/10 text-gold flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold mb-0.5 text-ink">{s.name}</h3>

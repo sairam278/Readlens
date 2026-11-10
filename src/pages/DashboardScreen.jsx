@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { docs, statusBadge, diffColor, diffDot, FILTERS, SORTS, STATS } from "../data/documents";
+import { docs as defaultDocs, statusBadge, diffColor, diffDot, FILTERS, SORTS, STATS } from "../data/documents";
+import { getLocalDocuments, saveLocalDocument } from "../db/indexedDb";
+import ImportPaperModal from "../components/ImportPaperModal";
 
 function Sparkline({ data, positive = true }) {
   const min = Math.min(...data);
@@ -60,11 +62,31 @@ export default function DashboardScreen({ go }) {
   const [viewMode, setViewMode] = useState("grid");
   const [isLoading, setIsLoading] = useState(true);
   const [tourStep, setTourStep] = useState(-1);
+  const [isImportModalOpen, setImportModalOpen] = useState(false);
+  const [documents, setDocuments] = useState(defaultDocs);
 
-  // Simulate API load
+  // Load local documents from IndexedDB
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 1400);
-    return () => clearTimeout(t);
+    async function loadDocs() {
+      try {
+        const local = await getLocalDocuments();
+        if (local && local.length > 0) {
+          // Merge custom imported docs with defaults (avoiding duplicates)
+          const merged = [...local];
+          defaultDocs.forEach(d => {
+            if (!merged.find(m => m.title === d.title)) {
+              merged.push(d);
+            }
+          });
+          setDocuments(merged);
+        }
+      } catch (e) {
+        console.warn("IndexedDB load error, fallback to defaults:", e);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadDocs();
   }, []);
 
   // First-visit onboarding tour
@@ -85,7 +107,7 @@ export default function DashboardScreen({ go }) {
   };
 
   const filtered = useMemo(() => {
-    let list = docs.filter(d => {
+    let list = documents.filter(d => {
       const matchFilter = filter === "All" || d.status === filter;
       const matchSearch = d.title.toLowerCase().includes(search.toLowerCase());
       return matchFilter && matchSearch;
@@ -114,10 +136,11 @@ export default function DashboardScreen({ go }) {
             </span>
           )}
           <button
-            onClick={() => go("docmap")}
-            className="bg-gold text-bg px-6 py-3 rounded-xl font-semibold text-sm hover:bg-gold-light hover:-translate-y-px hover:shadow-md transition-all cursor-pointer"
+            onClick={() => setImportModalOpen(true)}
+            className="bg-gold text-bg px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-gold-light hover:-translate-y-px hover:shadow-md transition-all cursor-pointer flex items-center gap-2"
           >
-            + Upload Document
+            <span>+</span>
+            <span>Import Paper (arXiv / PDF)</span>
           </button>
         </div>
       </div>
@@ -283,9 +306,9 @@ export default function DashboardScreen({ go }) {
 
       {/* Result count */}
       <p className="text-xs text-muted mb-3">
-        {filtered.length === docs.length
-          ? `${docs.length} documents`
-          : `${filtered.length} of ${docs.length} documents`}
+        {filtered.length === documents.length
+          ? `${documents.length} documents`
+          : `${filtered.length} of ${documents.length} documents`}
         {search && <span> matching <span className="text-ink">"{search}"</span></span>}
       </p>
 
@@ -474,6 +497,14 @@ export default function DashboardScreen({ go }) {
           </div>
         </>
       )}
+      <ImportPaperModal
+        isOpen={isImportModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onImportSuccess={(newDoc) => {
+          setDocuments(prev => [newDoc, ...prev.filter(d => d.id !== newDoc.id)]);
+          go("reading");
+        }}
+      />
     </div>
   );
 }
